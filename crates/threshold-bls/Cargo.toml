@@ -13,9 +13,9 @@ rand = "0.8.5"
 serde = {version = "1.0.106", features = ["derive"] }
 
 # for ECIES
-chacha20poly1305 = "0.9"
-hkdf = "0.8"
-sha2 = "0.8"
+chacha20poly1305 = "0.10.1"
+hkdf = "0.12.4"
+sha2 = "0.10.8"
 
 # bls12_377
 ark-bls12-377 = { version = "0.3.0" }

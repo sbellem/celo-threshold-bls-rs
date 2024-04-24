@@ -224,7 +224,7 @@ mod tests {
         let s = matrix.to_string();
         assert_eq!(
             s,
-            "-> dealer 0: [000]\n-> dealer 1: [000]\n-> dealer 2: [000]\n"
+            "-> dealer 0: [0, 0, 0]\n-> dealer 1: [0, 0, 0]\n-> dealer 2: [0, 0, 0]\n"
         );
     }
 }

@@ -29,7 +29,7 @@ wasm-bindgen = { version = "0.2.60", optional = true }
 # code size when deploying.
 console_error_panic_hook = { version = "0.1.7", optional = true }
 
-cfg-if = "0.1"
+cfg-if = "1.0.0"
 
 [target.aarch64-linux-android]
 ar = "<project path>/greetings/NDK/arm64/bin/aarch64-linux-android-ar"

@@ -33,7 +33,7 @@ use serde::{Deserialize, Serialize};
 
 // crypto imports
 use chacha20poly1305::{
-    aead::{Aead, Error as AError, NewAead},
+    aead::{Aead, Error as AError, KeyInit},
     ChaCha20Poly1305,
 };
 use hkdf::Hkdf;
