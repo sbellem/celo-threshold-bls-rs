@@ -1,7 +1,7 @@
 // Using the ABIEncoderV2 poses little risk here because we only use it for fetching the byte arrays
 // of shares/responses/justifications
 pragma experimental ABIEncoderV2;
-pragma solidity ^0.6.6;
+pragma solidity ^0.8.24;
 
 contract DKG {
     enum UserState {
@@ -52,7 +52,7 @@ contract DKG {
         _;
     }
 
-    constructor(uint256 threshold, uint256 duration) public {
+    constructor(uint256 threshold, uint256 duration) {
         PHASE_DURATION = duration;
         THRESHOLD = threshold;
         owner = msg.sender;
