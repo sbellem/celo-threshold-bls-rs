@@ -1,10 +1,10 @@
 use crate::group::PrimeOrder;
 use crate::group::{self, Element, PairingCurve as PC, Point, Scalar as Sc};
 use ark_bls12_377 as bls377;
-use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve};
+use ark_ec::{AffineRepr, pairing::Pairing, CurveGroup, Group};
 use ark_ff::PrimeField;
 use ark_ff::{Field, One, UniformRand, Zero};
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress};
 use bls_crypto::{
     hash_to_curve::{try_and_increment::TryAndIncrement, HashToCurve},
     hashers::DirectHasher,
@@ -38,10 +38,12 @@ pub enum ZexeError {
 pub struct Scalar(
     #[serde(deserialize_with = "deserialize_field")]
     #[serde(serialize_with = "serialize_field")]
-    <bls377::Bls12_377 as PairingEngine>::Fr,
+    <bls377::Bls12_377 as Pairing>::ScalarField,
+    //<bls377::Bls12_377 as PairingEngine>::Fr,
 );
 
-type ZG1 = <bls377::Bls12_377 as PairingEngine>::G1Projective;
+type ZG1 = <bls377::Bls12_377 as Pairing>::G1;
+//type ZG1 = <bls377::Bls12_377 as PairingEngine>::G1Projective;
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct G1(
@@ -50,7 +52,8 @@ pub struct G1(
     ZG1,
 );
 
-type ZG2 = <bls377::Bls12_377 as PairingEngine>::G2Projective;
+type ZG2 = <bls377::Bls12_377 as Pairing>::G2;
+//type ZG2 = <bls377::Bls12_377 as PairingEngine>::G2Projective;
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct G2(
@@ -63,7 +66,7 @@ pub struct G2(
 pub struct GT(
     #[serde(deserialize_with = "deserialize_field")]
     #[serde(serialize_with = "serialize_field")]
-    <bls377::Bls12_377 as PairingEngine>::Fqk,
+    <bls377::Bls12_377 as Pairing>::TargetField,
 );
 
 impl Element for Scalar {
@@ -86,12 +89,14 @@ impl Element for Scalar {
     }
 
     fn rand<R: rand_core::RngCore>(rng: &mut R) -> Self {
+        //Self(bls377::ScalarField::rand(rng))
         Self(bls377::Fr::rand(rng))
     }
 }
 
 impl Sc for Scalar {
     fn set_int(&mut self, i: u64) {
+        //*self = Self(bls377::ScalarField::from(i))
         *self = Self(bls377::Fr::from(i))
     }
 
@@ -108,12 +113,13 @@ impl Sc for Scalar {
     }
 
     fn from_random_bytes(bytes: &[u8]) -> Option<Self> {
+        //let fr = bls377::ScalarField::from_random_bytes(bytes)?;
         let fr = bls377::Fr::from_random_bytes(bytes)?;
         Some(Self(fr))
     }
 
     fn serialized_size(&self) -> usize {
-        self.0.serialized_size()
+        self.0.serialized_size(Compress::No)
     }
 }
 
@@ -132,7 +138,8 @@ impl Element for G1 {
     }
 
     fn one() -> Self {
-        Self(ZG1::prime_subgroup_generator())
+        //Self(ZG1::prime_subgroup_generator())
+        Self(ZG1::generator())
     }
 
     fn rand<R: RngCore>(rng: &mut R) -> Self {
@@ -178,7 +185,8 @@ impl Element for G2 {
     }
 
     fn one() -> Self {
-        Self(ZG2::prime_subgroup_generator())
+        //Self(ZG2::prime_subgroup_generator())
+        Self(ZG2::generator())
     }
 
     fn rand<R: RngCore>(mut rng: &mut R) -> Self {
@@ -229,7 +237,7 @@ impl Element for GT {
         self.0.mul_assign(s2.0);
     }
     fn mul(&mut self, mul: &Scalar) {
-        let scalar = mul.0.into_repr();
+        let scalar = mul.0.into_bigint();
         let mut res = Self::one();
         let mut temp = self.clone();
         for b in ark_ff::BitIteratorLE::without_trailing_zeros(scalar) {
@@ -249,7 +257,8 @@ impl Element for GT {
 impl PrimeOrder for GT {
     fn in_correct_subgroup(&self) -> bool {
         self.0
-            .pow(<bls377::Bls12_377 as PairingEngine>::Fr::characteristic())
+            .pow(<bls377::Bls12_377 as Pairing>::ScalarField::characteristic())
+            //.pow(<bls377::Bls12_377 as PairingEngine>::Fr::characteristic())
             .is_one()
     }
 }
@@ -273,7 +282,7 @@ impl PC for PairingCurve {
     type GT = GT;
 
     fn pair(a: &Self::G1, b: &Self::G2) -> Self::GT {
-        GT(<bls377::Bls12_377 as PairingEngine>::pairing(a.0, b.0))
+        GT(<bls377::Bls12_377 as Pairing>::pairing(a.0, b.0).0)
     }
 }
 
@@ -300,7 +309,7 @@ where
         where
             S: SeqAccess<'de>,
         {
-            let len = C::zero().serialized_size();
+            let len = C::zero().serialized_size(Compress::No);
             let bytes: Vec<u8> = (0..len)
                 .map(|_| {
                     seq.next_element()?
@@ -308,13 +317,13 @@ where
                 })
                 .collect::<Result<Vec<_>, _>>()?;
 
-            let res = C::deserialize(&mut &bytes[..]).map_err(DeserializeError::custom)?;
+            let res = C::deserialize_compressed(&mut &bytes[..]).map_err(DeserializeError::custom)?;
             Ok(res)
         }
     }
 
     let visitor = FieldVisitor(PhantomData);
-    deserializer.deserialize_tuple(C::zero().serialized_size(), visitor)
+    deserializer.deserialize_tuple(C::zero().serialized_size(Compress::No), visitor)
 }
 
 fn serialize_field<S, C>(c: &C, s: S) -> Result<S::Ok, S::Error>
@@ -322,9 +331,9 @@ where
     S: Serializer,
     C: Field,
 {
-    let len = c.serialized_size();
+    let len = c.serialized_size(Compress::No);
     let mut bytes = Vec::with_capacity(len);
-    c.serialize(&mut bytes)
+    c.serialize_compressed(&mut bytes)
         .map_err(SerializationError::custom)?;
 
     let mut tup = s.serialize_tuple(len)?;
@@ -337,14 +346,16 @@ where
 fn deserialize_group<'de, D, C>(deserializer: D) -> Result<C, D::Error>
 where
     D: Deserializer<'de>,
-    C: ProjectiveCurve,
+    C: CurveGroup,
+    //C: ProjectiveCurve,
     C::Affine: CanonicalDeserialize + CanonicalSerialize,
 {
     struct GroupVisitor<C>(PhantomData<C>);
 
     impl<'de, C> Visitor<'de> for GroupVisitor<C>
     where
-        C: ProjectiveCurve,
+        C: CurveGroup,
+        //C: ProjectiveCurve,
         //C::Affine: CanonicalDeserialize + CanonicalSerialize,
     {
         type Value = C;
@@ -357,7 +368,7 @@ where
         where
             S: SeqAccess<'de>,
         {
-            let len = C::Affine::zero().serialized_size(); //C::Affine::SERIALIZED_SIZE;
+            let len = C::Affine::zero().serialized_size(Compress::No); //C::Affine::SERIALIZED_SIZE;
             let bytes: Vec<u8> = (0..len)
                 .map(|_| {
                     seq.next_element()?
@@ -366,26 +377,28 @@ where
                 .collect::<Result<Vec<_>, _>>()?;
 
             let affine =
-                C::Affine::deserialize(&mut &bytes[..]).map_err(DeserializeError::custom)?;
-            Ok(affine.into_projective())
+                C::Affine::deserialize_compressed(&mut &bytes[..]).map_err(DeserializeError::custom)?;
+            //Ok(affine.into_projective())
+            Ok(affine.into_group())
         }
     }
 
     let visitor = GroupVisitor(PhantomData);
-    deserializer.deserialize_tuple(C::Affine::zero().serialized_size(), visitor)
+    deserializer.deserialize_tuple(C::Affine::zero().serialized_size(Compress::No), visitor)
 }
 
 fn serialize_group<S, C>(c: &C, s: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
-    C: ProjectiveCurve,
+    C: CurveGroup,
+    //C: ProjectiveCurve,
     C::Affine: CanonicalSerialize,
 {
     let affine = c.into_affine();
-    let len = affine.serialized_size();
+    let len = affine.serialized_size(Compress::No);
     let mut bytes = Vec::with_capacity(len);
     affine
-        .serialize(&mut bytes)
+        .serialize_compressed(&mut bytes)
         .map_err(SerializationError::custom)?;
 
     let mut tup = s.serialize_tuple(len)?;
