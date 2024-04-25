@@ -1,0 +1,14 @@
+version: '3'
+
+services:
+  tbls:
+    image: tbls
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./crates:/usr/src/tbls/crates
+      - ./solidity:/usr/src/tbls/solidity
+      - ./Cargo.lock:/usr/src/tbls/Cargo.lock
+      - ./Cargo.toml:/usr/src/tbls/Cargo.toml
+
